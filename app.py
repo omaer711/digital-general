@@ -30,32 +30,55 @@ with st.sidebar:
         index=0
     )
     st.markdown("---")
-    st.info("💡 تم تفعيل محرك البحث الذكي لأسواق Binance.")
+    st.info("💡 تم تفعيل محرك البحث والربط السحابي الدائم.")
 
-def get_binance_price(symbol):
+def get_crypto_price(symbol):
+    clean = symbol.upper().strip().replace("USDT", "").replace("/", "")
+    # محاولة استخدام API عام وسريع لجلب الأسعار الحية
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={get_coingecko_id(clean)}&vs_currencies=usd&include_24hr_change=true"
     try:
-        # تنظيف الرمز المكتوب وتحويله إلى أحرف كبيرة
-        clean = symbol.upper().strip().replace("/", "").replace("-", "")
-        if not clean.endswith("USDT"):
-            clean += "USDT"
-            
-        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={clean}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
+        res = requests.get(url, timeout=4)
+        if res.status_code == 200:
+            data = res.json()
+            coin_id = get_coingecko_id(clean)
+            if coin_id in data:
+                return {
+                    "symbol": clean + "USDT",
+                    "price": float(data[coin_id]["usd"]),
+                    "change": float(data[coin_id].get("usd_24h_change", 0))
+                }
+    except:
+        pass
+    
+    # محاولة احتياطية من Binance مباشرة
+    try:
+        b_url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={clean}USDT"
+        res = requests.get(b_url, timeout=3)
+        if res.status_code == 200:
+            d = res.json()
             return {
-                "symbol": clean,
-                "price": float(data["lastPrice"]),
-                "change": float(data["priceChangePercent"]),
-                "high": float(data["highPrice"]),
-                "low": float(data["lowPrice"]),
-                "volume": float(data["quoteVolume"])
+                "symbol": d["symbol"],
+                "price": float(d["lastPrice"]),
+                "change": float(d["priceChangePercent"])
             }
-        return None
-    except Exception as e:
-        return None
+    except:
+        pass
+    return None
+
+def get_coingecko_id(symbol):
+    mapping = {
+        "BTC": "bitcoin",
+        "ETH": "ethereum",
+        "SOL": "solana",
+        "XRP": "ripple",
+        "BNB": "binancecoin",
+        "ADA": "cardano",
+        "DOGE": "dogecoin",
+        "AVAX": "avalanche-2",
+        "LINK": "chainlink",
+        "PEPE": "pepe"
+    }
+    return mapping.get(symbol, "bitcoin")
 
 if selected_tab == "الرئيسية (Dashboard)":
     st.subheader("📊 نظرة عامة على الأسواق والأداء الأسبوعي")
@@ -68,36 +91,49 @@ if selected_tab == "الرئيسية (Dashboard)":
         st.metric(label="الذكاء الاصطناعي (Horizon)", value="77% صاعد", delta="توقع قوي")
 
     st.markdown("---")
-    st.subheader("🔍 محرك البحث الفوري في أسواق Binance")
+    st.subheader("🔍 محرك البحث الفوري في الأسواق")
     
-    # مربع البحث مع قيمة افتراضية BTC
-    search_query = st.text_input("أدخل اسم العملة (مثال: BTC أو XRP أو SOL):", value="BTC")
+    search_query = st.text_input("أدخل رمز العملة (مثال: BTC, ETH, SOL, XRP):", value="BTC")
     
     if search_query:
-        with st.spinner("جاري جلب البيانات الحية من Binance..."):
-            coin_data = get_binance_price(search_query)
-            if coin_data:
-                st.success(f"تم العثور على العملة بنجاح: {coin_data['symbol']}")
-                c1, c2, c3, c4 = st.columns(4)
+        with st.spinner("جاري جلب السعر الحي..."):
+            data = get_crypto_price(search_query)
+            if data:
+                st.success(f"العملة: {data['symbol']}")
+                c1, c2 = st.columns(2)
                 with c1:
-                    st.metric("السعر الحالي", f"${coin_data['price']:,.4f}")
+                    st.metric("السعر الحالي (USD)", f"${data['price']:,.2f}")
                 with c2:
-                    st.metric("التغير (24س)", f"{coin_data['change']:+.2f}%")
-                with c3:
-                    st.metric("أعلى سعر (24س)", f"${coin_data['high']:,.4f}")
-                with c4:
-                    st.metric("حجم التداول (USDT)", f"${coin_data['volume']:,.0f}")
+                    st.metric("التغير خلال 24 ساعة", f"{data['change']:+.2f}%")
             else:
-                st.error(f"لم يتم العثور على عملة مطابقة لـ '{search_query}'. يرجى التأكد من الرمز (مثال: BTC, XRP, SOL).")
+                st.error("لم يتم العثور على السعر، تأكد من كتابة الرمز الصحيح (مثل: BTC أو ETH).")
 
 elif selected_tab == "التحليل الفني & Horizon AI":
     st.subheader("📈 التحليل الفني و توقعات Horizon AI")
-    st.info("مدمج الآن مع محرك جلب الأسعار والشموع الفورية.")
+    st.info("مدمج الآن مع أدوات التحليل الفوري للمنصة.")
 
 elif selected_tab == "سجل الصفقات (Trade Journal)":
     st.subheader("📝 دفتر الصفقات الاحترافي")
     st.info("تسجيل ومتابعة صفقاتك بدقة R-Multiple.")
 
 else:
-    st.subheader("⚡ ماسح السوق الذكي")
-    st.info("فحص العملات القوية وتنبيهات الأداء اللحظي.")
+    st.subheader("⚡ ماسح السوق الذكي والعملات القوية")
+    st.markdown("قائمة بأبرز العملات الرقمية وتحديثاتها اللحظية:")
+    
+    coins = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"]
+    table_data = []
+    
+    for c in coins:
+        res = get_crypto_price(c)
+        if res:
+            table_data.append({
+                "العملة": res["symbol"],
+                "السعر ($)": f"${res['price']:,.2f}",
+                "التغير (24س)": f"{res['change']:+.2f}%"
+            })
+    
+    if table_data:
+        df = pd.DataFrame(table_data)
+        st.table(df)
+    else:
+        st.warning("جاري الاتصال بالخوادم لجلب بيانات الماسح...")
