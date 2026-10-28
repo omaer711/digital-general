@@ -34,23 +34,27 @@ with st.sidebar:
 
 def get_binance_price(symbol):
     try:
-        clean_symbol = symbol.upper().strip().replace("/", "")
-        if not clean_symbol.endswith("USDT"):
-            clean_symbol += "USDT"
-        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={clean_symbol}"
-        response = requests.get(url, timeout=5)
+        # تنظيف الرمز المكتوب وتحويله إلى أحرف كبيرة
+        clean = symbol.upper().strip().replace("/", "").replace("-", "")
+        if not clean.endswith("USDT"):
+            clean += "USDT"
+            
+        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={clean}"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=5)
+        
         if response.status_code == 200:
             data = response.json()
             return {
-                "symbol": clean_symbol,
+                "symbol": clean,
                 "price": float(data["lastPrice"]),
                 "change": float(data["priceChangePercent"]),
                 "high": float(data["highPrice"]),
                 "low": float(data["lowPrice"]),
-                "volume": float(data["volume"])
+                "volume": float(data["quoteVolume"])
             }
         return None
-    except:
+    except Exception as e:
         return None
 
 if selected_tab == "الرئيسية (Dashboard)":
@@ -65,23 +69,26 @@ if selected_tab == "الرئيسية (Dashboard)":
 
     st.markdown("---")
     st.subheader("🔍 محرك البحث الفوري في أسواق Binance")
-    search_query = st.text_input("أدخل اسم العملة (مثل: BTC, ETH, SOL, XRP):", value="BTC")
+    
+    # مربع البحث مع قيمة افتراضية BTC
+    search_query = st.text_input("أدخل اسم العملة (مثال: BTC أو XRP أو SOL):", value="BTC")
     
     if search_query:
-        coin_data = get_binance_price(search_query)
-        if coin_data:
-            st.success(f"تم العثور على العملة بنجاح: {coin_data['symbol']}")
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                st.metric("السعر الحالي", f"${coin_data['price']:,.4f}")
-            with c2:
-                st.metric("التغير (24س)", f"{coin_data['change']:+.2f}%")
-            with c3:
-                st.metric("أعلى سعر", f"${coin_data['high']:,.4f}")
-            with c4:
-                st.metric("أدنى سعر", f"${coin_data['low']:,.4f}")
-        else:
-            st.error(f"لم يتم العثور على عملة مطابقة لـ '{search_query}'. يرجى التأكد من كتابة الرمز الصحيح.")
+        with st.spinner("جاري جلب البيانات الحية من Binance..."):
+            coin_data = get_binance_price(search_query)
+            if coin_data:
+                st.success(f"تم العثور على العملة بنجاح: {coin_data['symbol']}")
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    st.metric("السعر الحالي", f"${coin_data['price']:,.4f}")
+                with c2:
+                    st.metric("التغير (24س)", f"{coin_data['change']:+.2f}%")
+                with c3:
+                    st.metric("أعلى سعر (24س)", f"${coin_data['high']:,.4f}")
+                with c4:
+                    st.metric("حجم التداول (USDT)", f"${coin_data['volume']:,.0f}")
+            else:
+                st.error(f"لم يتم العثور على عملة مطابقة لـ '{search_query}'. يرجى التأكد من الرمز (مثال: BTC, XRP, SOL).")
 
 elif selected_tab == "التحليل الفني & Horizon AI":
     st.subheader("📈 التحليل الفني و توقعات Horizon AI")
